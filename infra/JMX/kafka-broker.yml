@@ -1,0 +1,57 @@
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+rules:
+  # Kafka Broker / ReplicaManager — UnderReplicatedPartitions и др.
+  - pattern: "kafka.server<type=(.+), name=(.+)><>Value"
+    name: "kafka_server_$1_$2"
+    type: GAUGE
+
+  - pattern: "kafka.server<type=(.+), name=(.+), topic=(.+), partition=(.+)><>Value"
+    name: "kafka_server_$1_$2"
+    labels:
+      topic: "$3"
+      partition: "$4"
+    type: GAUGE
+
+  # Kafka Network / Request metrics
+  - pattern: "kafka.network<type=(.+), name=(.+)><>Value"
+    name: "kafka_network_$1_$2"
+    type: GAUGE
+
+  # Kafka Log / LogFlush
+  - pattern: "kafka.log<type=(.+), name=(.+), topic=(.+), partition=(.+)><>Value"
+    name: "kafka_log_$1_$2"
+    labels:
+      topic: "$3"
+      partition: "$4"
+    type: GAUGE
+
+  # JVM memory, GC, threads
+  - pattern: "java.lang<type=Memory><(HeapMemoryUsage|NonHeapMemoryUsage)>(used|committed|max|init)"
+    name: "jvm_memory_$1_$2"
+    type: GAUGE
+
+  - pattern: "java.lang<type=GarbageCollector, name=(.+)><>CollectionCount"
+    name: "jvm_gc_collection_count"
+    labels:
+      gc: "$1"
+    type: COUNTER
+
+  - pattern: "java.lang<type=GarbageCollector, name=(.+)><>CollectionTime"
+    name: "jvm_gc_collection_time_ms"
+    labels:
+      gc: "$1"
+    type: COUNTER
+
+  - pattern: "java.lang<type=Threading><>(ThreadCount|DaemonThreadCount|PeakThreadCount)"
+    name: "jvm_threads_$1"
+    type: GAUGE
+
+  # OS / system metrics
+  - pattern: "java.lang<type=OperatingSystem><>(FreePhysicalMemorySize|TotalPhysicalMemorySize|SystemCpuLoad|ProcessCpuLoad|OpenFileDescriptorCount)"
+    name: "jvm_os_$1"
+    type: GAUGE
+
+  # Универсальное правило для всего остального
+  - pattern: ".*"
