@@ -5,7 +5,7 @@
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.example</groupId>
+  <groupId>com.example.kafka</groupId>
   <artifactId>debezium-consumer</artifactId>
   <version>1.0.0</version>
   <packaging>jar</packaging>
@@ -41,7 +41,7 @@
         <artifactId>exec-maven-plugin</artifactId>
         <version>3.1.0</version>
         <configuration>
-          <mainClass>DebeziumConsumer</mainClass>
+          <mainClass>com.example.kafka.DebeziumConsumer</mainClass>
         </configuration>
       </plugin>
     </plugins>
