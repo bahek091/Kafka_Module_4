@@ -1,0 +1,260 @@
+version: "3.5"
+
+services:
+
+  x-kafka-common:
+    &kafka-common
+    image: bitnamilegacy/kafka:3.7
+    networks:
+      - proxynet
+
+  # ============================================================
+  # Брокеры Kafka (KRaft, 3 узла) с JMX Exporter для Prometheus
+  # ============================================================
+  kafka-0:
+    <<: *kafka-common
+    container_name: kafka-0
+    restart: always
+    ports:
+      - "127.0.0.1:9094:9094"
+      - "127.0.0.1:9404:9404"   # JMX Exporter
+    environment:
+      KAFKA_ENABLE_KRAFT: yes
+      ALLOW_PLAINTEXT_LISTENER: yes
+      KAFKA_KRAFT_CLUSTER_ID: practicum
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka-0:9092,EXTERNAL://127.0.0.1:9094
+      KAFKA_OPTS: >-
+        -javaagent:/opt/jmx_prometheus_javaagent-0.17.2.jar=9404:/opt/kafka-broker.yml
+    volumes:
+      - kafka_0_data:/bitnami/kafka
+      - ./jmx/jmx_prometheus_javaagent-0.17.2.jar:/opt/jmx_prometheus_javaagent-0.17.2.jar:ro
+      - ./jmx/kafka-broker.yml:/opt/kafka-broker.yml:ro
+
+  kafka-1:
+    <<: *kafka-common
+    container_name: kafka-1
+    restart: always
+    ports:
+      - "127.0.0.1:9095:9095"
+      - "127.0.0.1:9405:9404"
+    environment:
+      KAFKA_ENABLE_KRAFT: yes
+      ALLOW_PLAINTEXT_LISTENER: yes
+      KAFKA_KRAFT_CLUSTER_ID: practicum
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9095
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9092,EXTERNAL://127.0.0.1:9095
+      KAFKA_OPTS: >-
+        -javaagent:/opt/jmx_prometheus_javaagent-0.17.2.jar=9404:/opt/kafka-broker.yml
+    volumes:
+      - kafka_1_data:/bitnami/kafka
+      - ./jmx/jmx_prometheus_javaagent-0.17.2.jar:/opt/jmx_prometheus_javaagent-0.17.2.jar:ro
+      - ./jmx/kafka-broker.yml:/opt/kafka-broker.yml:ro
+
+  kafka-2:
+    <<: *kafka-common
+    container_name: kafka-2
+    restart: always
+    ports:
+      - "127.0.0.1:9096:9096"
+      - "127.0.0.1:9406:9404"
+    environment:
+      KAFKA_ENABLE_KRAFT: yes
+      ALLOW_PLAINTEXT_LISTENER: yes
+      KAFKA_KRAFT_CLUSTER_ID: practicum
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka-0:9093,1@kafka-1:9093,2@kafka-2:9093
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CFG_NODE_ID: 2
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9096
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9092,EXTERNAL://127.0.0.1:9096
+      KAFKA_OPTS: >-
+        -javaagent:/opt/jmx_prometheus_javaagent-0.17.2.jar=9404:/opt/kafka-broker.yml
+    volumes:
+      - kafka_2_data:/bitnami/kafka
+      - ./jmx/jmx_prometheus_javaagent-0.17.2.jar:/opt/jmx_prometheus_javaagent-0.17.2.jar:ro
+      - ./jmx/kafka-broker.yml:/opt/kafka-broker.yml:ro
+
+  # ============================================================
+  # Kafka UI
+  # ============================================================
+  ui:
+    image: provectuslabs/kafka-ui:v0.7.0
+    container_name: kafka-ui
+    restart: always
+    ports:
+      - "127.0.0.1:8086:8080"
+    environment:
+      KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS: kafka-0:9092,kafka-1:9092,kafka-2:9092
+      KAFKA_CLUSTERS_0_NAME: kraft
+    depends_on:
+      - kafka-0
+      - kafka-1
+      - kafka-2
+    networks:
+      - proxynet
+
+  # ============================================================
+  # Schema Registry
+  # ============================================================
+  schema-registry:
+    image: bitnamilegacy/schema-registry:7.6
+    container_name: schema-registry
+    restart: always
+    ports:
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      - kafka-0
+      - kafka-1
+      - kafka-2
+    environment:
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKA_BROKERS: PLAINTEXT://kafka-0:9092,PLAINTEXT://kafka-1:9092,PLAINTEXT://kafka-2:9092
+    networks:
+      - proxynet
+
+  # ============================================================
+  # Kafka Connect (Debezium + JMX Prometheus Exporter)
+  # ============================================================
+  kafka-connect:
+    build:
+      context: ./kafka-connect
+    container_name: kafka-connect
+    restart: always
+    ports:
+      - "127.0.0.1:8083:8083"
+      - "127.0.0.1:9875:9875"
+      - "127.0.0.1:9876:9876"
+    depends_on:
+      - kafka-0
+      - kafka-1
+      - kafka-2
+      - schema-registry
+      - postgres
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka-0:9092,kafka-1:9092,kafka-2:9092
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: kafka-connect
+      CONNECT_REST_ADVERTISED_HOST_NAME: localhost
+
+      CONNECT_CONFIG_STORAGE_TOPIC: connect-config-storage
+      CONNECT_OFFSET_STORAGE_TOPIC: connect-offset-storage
+      CONNECT_STATUS_STORAGE_TOPIC: connect-status-storage
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 3
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 3
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 3
+
+      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+
+      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components,/etc/kafka-connect/jars,/usr/share/filestream-connectors
+
+      KAFKA_JMX_PORT: '9875'
+      KAFKA_JMX_OPTS: >-
+        -javaagent:/opt/jmx_prometheus_javaagent-0.17.2.jar=9876:/opt/kafka-connect.yml
+        -Dcom.sun.management.jmxremote=true
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+    networks:
+      - proxynet
+
+  # ============================================================
+  # PostgreSQL
+  # ============================================================
+  postgres:
+    image: debezium/postgres:16
+    hostname: postgres
+    container_name: postgres
+    restart: always
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: postgres-user
+      POSTGRES_PASSWORD: postgres-pw
+      POSTGRES_DB: customers
+    volumes:
+      - ./postgres/custom-config.conf:/etc/postgresql/postgresql.conf
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    networks:
+      - proxynet
+
+  # ============================================================
+  # Prometheus
+  # ============================================================
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    restart: always
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus
+    command: --web.enable-lifecycle --config.file=/etc/prometheus/prometheus.yml
+    depends_on:
+      - kafka-0
+      - kafka-1
+      - kafka-2
+      - kafka-connect
+    networks:
+      - proxynet
+
+  # ============================================================
+  # Grafana
+  # ============================================================
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: grafana
+    restart: always
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - proxynet
+
+  # ============================================================
+  # Запуск скрипта для создания коннектора
+  # ============================================================
+  connector-init:
+    image: alpine:latest
+    container_name: connector-init
+    depends_on:
+      - kafka-connect
+    volumes:
+      - ./register-connector.sh:/register-connector.sh:ro
+      - ./register-postgres.json:/config/register-postgres.json:ro
+    command: sh -c "apk add --no-cache curl bash && bash /register-connector.sh"
+    networks:
+      - proxynet
+
+networks:
+  proxynet:
+    name: custom_network
+
+volumes:
+  kafka_0_data:
+  kafka_1_data:
+  kafka_2_data:

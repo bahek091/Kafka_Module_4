@@ -1,0 +1,30 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'kafka-connect-host'
+    static_configs:
+      - targets: ['kafka-connect:9876']
+
+  - job_name: 'kafka-broker-0'
+    static_configs:
+      - targets: ['kafka-0:9404']
+        labels:
+          broker: 'kafka-0'
+
+  - job_name: 'kafka-broker-1'
+    static_configs:
+      - targets: ['kafka-1:9404']
+        labels:
+          broker: 'kafka-1'
+
+  - job_name: 'kafka-broker-2'
+    static_configs:
+      - targets: ['kafka-2:9404']
+        labels:
+          broker: 'kafka-2'
